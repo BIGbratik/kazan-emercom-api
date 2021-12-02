@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 func getHandler(fileName string) func(w http.ResponseWriter, r *http.Request) {
@@ -19,9 +22,6 @@ func getHandler(fileName string) func(w http.ResponseWriter, r *http.Request) {
 		objectsArray := parser.Parser(file)
 
 		b, _ := json.Marshal(objectsArray)
-
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		fmt.Fprintf(w, string(b))
 	}
@@ -51,23 +51,26 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 		newObject.Name + ", " +
 		newObject.Extra + "\n")
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
 	fmt.Fprintf(w, "OK")
 }
 
 func main() {
+	router := mux.NewRouter()
+
+	headers := handlers.AllowedHeaders([]string{"Content-Type"})
+	methods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"})
+	origins := handlers.AllowedOrigins([]string{"*"})
+
 	files, _ := ioutil.ReadDir("data")
 
 	for _, file := range files {
 		if file.Name() != ".DS_Store" {
 			fileName := strings.Split(file.Name(), ".")
-			http.HandleFunc("/"+fileName[0], getHandler(fileName[0]))
+			router.HandleFunc("/"+fileName[0], getHandler(fileName[0]))
 		}
 	}
 
-	http.HandleFunc("/create", createHandler)
+	router.HandleFunc("/create", createHandler)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(headers, methods, origins)(router)))
 }
